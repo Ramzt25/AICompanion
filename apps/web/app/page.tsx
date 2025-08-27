@@ -1,20 +1,61 @@
 'use client'
 
+import { useEffect } from 'react'
+import { useAuth } from '@/lib/AuthContext'
+import { useRouter } from 'next/navigation'
 import FloatingChatWidget from '@/components/layout/FloatingChatWidget'
 
 export default function HomePage() {
+  const { user, isLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push('/login')
+    }
+  }, [user, isLoading, router])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            AI Knowledge Companion
-          </h1>
-          <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-            Your intelligent assistant with contextual awareness, organizational learning, 
-            and enterprise-grade knowledge management capabilities.
-          </p>
+          <div className="mb-6">
+            <h1 className="text-5xl font-bold text-gray-900 mb-2">
+              Welcome back, {user.name}!
+            </h1>
+            <p className="text-xl text-gray-600 mb-4 leading-relaxed">
+              Your intelligent assistant is ready with contextual awareness, organizational learning, 
+              and enterprise-grade knowledge management capabilities.
+            </p>
+            <div className="flex items-center justify-center space-x-4 text-sm">
+              <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                {user.role === 'personal' && 'Personal User'}
+                {user.role === 'enterprise_user' && 'Enterprise User'}
+                {user.role === 'enterprise_admin' && 'Enterprise Admin'}
+              </div>
+              {user.organizationName && (
+                <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  {user.organizationName}
+                </div>
+              )}
+            </div>
+          </div>
           
           {/* Feature Grid */}
           <div className="grid md:grid-cols-3 gap-8 mt-16">

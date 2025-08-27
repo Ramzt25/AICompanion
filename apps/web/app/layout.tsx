@@ -1,4 +1,5 @@
 import '../styles/globals.css'
+import { AuthProvider } from '@/lib/AuthContext'
 
 export const metadata = {
   title: 'AI Knowledge Companion',
@@ -13,7 +14,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   )
