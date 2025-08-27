@@ -1,0 +1,28 @@
+{
+  "name": "@ai-companion/worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-companion/shared": "workspace:*",
+    "bullmq": "^4.15.0",
+    "ioredis": "^5.3.2",
+    "openai": "^4.20.0",
+    "pg": "^8.11.3",
+    "rrule": "^2.7.2",
+    "uuid": "^9.0.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "@types/pg": "^8.10.7",
+    "@types/uuid": "^9.0.5",
+    "tsx": "^4.1.0",
+    "typescript": "^5.2.2"
+  }
+}
