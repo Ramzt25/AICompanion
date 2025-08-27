@@ -4,9 +4,10 @@ import { useState } from 'react'
 import ChatInterface from '@/components/chat/ChatInterface'
 import CitationsPanel from '@/components/citations/CitationsPanel'
 import Sidebar from '@/components/layout/Sidebar'
+import type { Citation } from '@ai-companion/shared'
 
 export default function HomePage() {
-  const [selectedCitations, setSelectedCitations] = useState([])
+  const [selectedCitations, setSelectedCitations] = useState<Citation[]>([])
 
   return (
     <>

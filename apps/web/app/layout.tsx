@@ -1,7 +1,4 @@
-import './globals.css'
-import { Inter } from 'next/font/google'
-
-const inter = Inter({ subsets: ['latin'] })
+import '../styles/globals.css'
 
 export const metadata = {
   title: 'AI Knowledge Companion',
@@ -15,7 +12,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className="font-sans">
         <div className="flex h-screen bg-gray-50">
           {children}
         </div>
