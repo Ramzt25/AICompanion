@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { Send, Loader2, Brain, User } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
-import { IndividualUserLearningSystem } from '@/lib/individual-user-learning'
 import type { ChatResponse, Citation, ContextualSuggestion } from '@ai-companion/shared'
 import ContextualCopilot from '@/components/contextual/ContextualCopilot'
 import FeedbackPanel from '@/components/feedback/FeedbackPanel'
@@ -62,12 +61,15 @@ export default function ChatInterface({ onCitationsUpdate }: ChatInterfaceProps)
     setIsLoading(true)
 
     try {
-      // Get personalized response configuration
-      const personalizedResponse = await IndividualUserLearningSystem.getPersonalizedResponseConfig(
-        user.id,
-        orgId,
-        input.trim()
-      )
+      // TODO: Implement personalized response API endpoint
+      const personalizedResponse = {
+        style_preferences: 'technical',
+        complexity_level: 'intermediate',
+        response_format: 'detailed',
+        personalizedContext: ['Based on your role and previous interactions'],
+        style: 'technical',
+        detailLevel: 'comprehensive'
+      }
       setPersonalizedConfig(personalizedResponse)
 
       // Simulate enhanced response with personalization
@@ -92,16 +94,13 @@ export default function ChatInterface({ onCitationsUpdate }: ChatInterfaceProps)
       setMessages(prev => [...prev, assistantMessage])
       onCitationsUpdate(enhancedResponse.citations)
 
-      // Record this interaction for learning
-      await IndividualUserLearningSystem.recordUserInteraction(
-        user.id,
+      // TODO: Implement API endpoint to record user interaction
+      console.log('Recording interaction:', {
+        userId: user.id,
         orgId,
-        input.trim(),
-        enhancedResponse.content,
-        undefined, // Will be set when user provides feedback
-        0, // follow-up questions
-        'normal' // urgency level
-      )
+        query: input.trim(),
+        response: enhancedResponse.content
+      })
 
     } catch (error) {
       console.error('Chat error:', error)

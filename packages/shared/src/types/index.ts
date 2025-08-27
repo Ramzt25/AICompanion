@@ -103,10 +103,12 @@ export const ChatRequestSchema = z.object({
 export const CitationSchema = z.object({
   doc_id: z.string(),
   chunk_id: z.string(),
-  uri: z.string(),
+  uri: z.string().optional(),
   title: z.string(),
-  span: z.string(),
-  score: z.number().optional()
+  span: z.string().optional(),
+  content: z.string().optional(),
+  score: z.number().optional(),
+  page: z.number().optional()
 })
 
 export const ToolCallSchema = z.object({
