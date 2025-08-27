@@ -27,65 +27,86 @@ Client (Next.js)  ←→  API Gateway (Next.js API)
                         └─ Audit/Analytics (Postgres)
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
-### Prerequisites
+### ⚡ One-Command Setup (Recommended)
 
+**Windows:**
+```powershell
+./deploy.ps1 start
+```
+
+**Linux/macOS:**
+```bash
+./deploy.sh start
+```
+
+**Windows (Command Prompt):**
+```cmd
+deploy.bat start
+```
+
+That's it! The script handles everything automatically:
+- ✅ Checks prerequisites (Docker, Node.js, pnpm)
+- ✅ Sets up environment configuration
+- ✅ Starts infrastructure (PostgreSQL + Redis)
+- ✅ Runs database migrations and seeding
+- ✅ Launches the application
+
+### 📋 Prerequisites
+
+**Required:**
+- Docker & Docker Compose
 - Node.js 18+
-- PostgreSQL with pgvector extension
-- Redis (for job queues)
+- pnpm
 - OpenAI API key
 
-### 1. Environment Setup
+**Auto-install available:** Run `./deploy.ps1 install` or `./deploy.sh install`
+
+### 🎪 Demo Users (Pre-configured)
+
+The application includes test users for all roles:
+
+- **👤 John Doe** (Personal User): `john.doe@example.com`
+- **👤 Sarah Wilson** (Enterprise User): `sarah.wilson@acmecorp.com`
+- **👤 Michael Chen** (Enterprise Admin): `admin@acmecorp.com`
+
+### 🔧 Manual Setup (Advanced)
+
+If you prefer manual setup:
 
 ```bash
-# Clone and install dependencies
+# 1. Clone and install dependencies
 git clone <repository-url>
 cd AICompanion
 pnpm install
 
-# Copy environment template
+# 2. Copy environment template
 cp .env.example .env.local
-```
+# Edit .env.local with your OpenAI API key
 
-### 2. Configure Environment
-
-Edit `.env.local` with your settings:
-
-```env
-# Database
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_companion
-
-# OpenAI
-OPENAI_API_KEY=your-openai-api-key-here
-
-# Redis
-REDIS_URL=redis://localhost:6379
-
-# Other configurations...
-```
-
-### 3. Start Infrastructure
-
-```bash
-# Start PostgreSQL and Redis
+# 3. Start infrastructure
 docker-compose -f infra/docker-compose.yml up -d
 
-# Run database migrations
+# 4. Setup database
 pnpm db:migrate
-
-# Seed demo data
 pnpm db:seed
-```
 
-### 4. Start Development
-
-```bash
-# Start all services
+# 5. Start application
 pnpm dev
 ```
 
 Visit http://localhost:3000 to see the application.
+
+### 🔍 Health Monitoring
+
+Check system status anytime:
+```bash
+./health-check.ps1    # PowerShell
+./health-check.sh     # Bash
+```
+
+📖 **See [QUICK_START.md](./QUICK_START.md) for detailed deployment guide**
 
 ## Usage
 
