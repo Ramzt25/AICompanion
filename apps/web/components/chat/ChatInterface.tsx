@@ -1,10 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { Send, Loader2 } from 'lucide-react'
+import { Send, Loader2, Brain, User } from 'lucide-react'
+import { useAuth } from '@/lib/AuthContext'
+import { IndividualUserLearningSystem } from '@/lib/individual-user-learning'
 import type { ChatResponse, Citation, ContextualSuggestion } from '@ai-companion/shared'
 import ContextualCopilot from '@/components/contextual/ContextualCopilot'
 import FeedbackPanel from '@/components/feedback/FeedbackPanel'
+import { Badge } from '@/components/ui/badge'
 
 interface ChatInterfaceProps {
   onCitationsUpdate: (citations: Citation[]) => void
@@ -17,15 +20,20 @@ interface Message {
   timestamp: string
   confidence?: number
   citations?: Citation[]
+  personalizedContext?: string[]
+  responseStyle?: string
+  detailLevel?: string
 }
 
 export default function ChatInterface({ onCitationsUpdate }: ChatInterfaceProps) {
+  const { user } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showFeedback, setShowFeedback] = useState<string | null>(null)
+  const [personalizedConfig, setPersonalizedConfig] = useState<any>(null)
 
-  const orgId = 'demo-org-id' // In production, this comes from auth
+  const orgId = user?.organizationId || 'demo-org-id'
 
   const handleSuggestionClick = (suggestion: ContextualSuggestion) => {
     if (suggestion.context_data?.suggested_query) {
@@ -40,7 +48,7 @@ export default function ChatInterface({ onCitationsUpdate }: ChatInterfaceProps)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || isLoading) return
+    if (!input.trim() || isLoading || !user) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -54,35 +62,46 @@ export default function ChatInterface({ onCitationsUpdate }: ChatInterfaceProps)
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: input.trim(),
-          org_id: orgId, // In production, this comes from auth
-          tools_allowed: ['google_drive', 'github']
-        }),
-      })
+      // Get personalized response configuration
+      const personalizedResponse = await IndividualUserLearningSystem.getPersonalizedResponseConfig(
+        user.id,
+        orgId,
+        input.trim()
+      )
+      setPersonalizedConfig(personalizedResponse)
 
-      if (!response.ok) {
-        throw new Error('Failed to get response')
-      }
-
-      const data: ChatResponse = await response.json()
+      // Simulate enhanced response with personalization
+      const enhancedResponse = await generatePersonalizedResponse(
+        input.trim(),
+        personalizedResponse,
+        user
+      )
       
       const assistantMessage: Message = {
         id: Date.now().toString() + '_assistant',
         role: 'assistant',
-        content: data.answer,
+        content: enhancedResponse.content,
         timestamp: new Date().toISOString(),
-        confidence: data.messages?.[1]?.confidence,
-        citations: data.citations
+        confidence: 0.85,
+        citations: enhancedResponse.citations,
+        personalizedContext: personalizedResponse.personalizedContext,
+        responseStyle: personalizedResponse.style,
+        detailLevel: personalizedResponse.detailLevel
       }
 
       setMessages(prev => [...prev, assistantMessage])
-      onCitationsUpdate(data.citations)
+      onCitationsUpdate(enhancedResponse.citations)
+
+      // Record this interaction for learning
+      await IndividualUserLearningSystem.recordUserInteraction(
+        user.id,
+        orgId,
+        input.trim(),
+        enhancedResponse.content,
+        undefined, // Will be set when user provides feedback
+        0, // follow-up questions
+        'normal' // urgency level
+      )
 
     } catch (error) {
       console.error('Chat error:', error)
@@ -96,6 +115,89 @@ export default function ChatInterface({ onCitationsUpdate }: ChatInterfaceProps)
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Generate personalized response based on user's learning profile
+  const generatePersonalizedResponse = async (query: string, config: any, user: any) => {
+    // This would integrate with your actual LLM/RAG pipeline
+    // For demo purposes, we'll generate a response that shows personalization
+    
+    const baseResponse = getBaseResponse(query)
+    const personalizedContent = applyPersonalization(baseResponse, config, user)
+    
+    return {
+      content: personalizedContent,
+      citations: generateSampleCitations(),
+      confidence: 0.85
+    }
+  }
+
+  const getBaseResponse = (query: string): string => {
+    if (query.toLowerCase().includes('safety')) {
+      return "Safety protocols are critical in construction projects. The key requirements include personal protective equipment (PPE), site inspection procedures, and emergency response protocols."
+    }
+    if (query.toLowerCase().includes('project')) {
+      return "Project management involves coordinating resources, timelines, and stakeholder communication to ensure successful completion within scope and budget."
+    }
+    return "Based on the available documentation, here's what I found relevant to your question..."
+  }
+
+  const applyPersonalization = (baseResponse: string, config: any, user: any): string => {
+    let personalizedResponse = baseResponse
+
+    // Add role-specific context
+    if (user.role === 'enterprise_admin') {
+      personalizedResponse += "\n\n**For Administrators:** Consider how this impacts organizational policies and compliance requirements."
+    } else if (user.role === 'enterprise_user') {
+      personalizedResponse += "\n\n**Team Context:** This information aligns with your department's current initiatives."
+    }
+
+    // Add expertise-aware content
+    if (config.personalizedContext?.includes('safety')) {
+      personalizedResponse += "\n\n*Given your expertise in safety protocols, you might also want to consider the latest OSHA updates in this area.*"
+    }
+
+    // Adjust detail level
+    if (config.detailLevel === 'brief') {
+      personalizedResponse = personalizedResponse.split('.')[0] + '. Contact me for more details.'
+    } else if (config.detailLevel === 'comprehensive') {
+      personalizedResponse += "\n\n**Additional Context:** This connects to previous discussions about workflow optimization and ties into the broader organizational strategy."
+    }
+
+    // Add response style adaptation
+    if (config.style === 'technical') {
+      personalizedResponse += "\n\n*Technical Note: Implementation requires consideration of system architecture and integration points.*"
+    } else if (config.style === 'step-by-step') {
+      personalizedResponse = convertToStepByStep(personalizedResponse)
+    }
+
+    return personalizedResponse
+  }
+
+  const convertToStepByStep = (content: string): string => {
+    const sentences = content.split('. ')
+    return sentences.map((sentence, index) => `${index + 1}. ${sentence.trim()}`).join('\n')
+  }
+
+  const generateSampleCitations = (): Citation[] => {
+    return [
+      {
+        doc_id: 'doc-1',
+        chunk_id: 'chunk-1',
+        title: 'Safety Protocols Manual',
+        content: 'Safety protocols must be followed at all times...',
+        score: 0.89,
+        page: 12
+      },
+      {
+        doc_id: 'doc-2', 
+        chunk_id: 'chunk-2',
+        title: 'Project Management Guidelines',
+        content: 'Effective project management requires...',
+        score: 0.76,
+        page: 8
+      }
+    ]
   }
 
   return (

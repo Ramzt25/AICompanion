@@ -1,10 +1,11 @@
 import { withOrgContext } from './db'
 import { generateEmbedding } from './embeddings'
+import { IndividualUserLearningSystem } from './individual-user-learning'
 import type { Feedback, Citation } from '@ai-companion/shared'
 
 export class FeedbackLearningSystem {
   /**
-   * Record user feedback on an answer
+   * Record user feedback on an answer with enhanced individual learning
    */
   static async recordFeedback(
     userId: string,
@@ -34,6 +35,30 @@ export class FeedbackLearningSystem {
 
       // Update organizational learning metrics
       await this.updateLearningMetrics(orgId, feedbackType, question, citations, client)
+
+      // NEW: Record individual user interaction for personalized learning
+      const userRating = this.feedbackTypeToRating(feedbackType)
+      await IndividualUserLearningSystem.recordUserInteraction(
+        userId,
+        orgId,
+        question,
+        answer,
+        userRating,
+        0, // follow-up questions (could be tracked separately)
+        'normal' // urgency level (could be inferred from context)
+      )
+
+      // NEW: Record document interactions based on citations
+      for (const citation of citations) {
+        await IndividualUserLearningSystem.recordDocumentInteraction(
+          userId,
+          orgId,
+          citation.doc_id,
+          'feedback_given',
+          question,
+          this.getFeedbackScoreAdjustment(feedbackType)
+        )
+      }
 
       return feedback
     })
@@ -120,7 +145,7 @@ export class FeedbackLearningSystem {
   }
 
   /**
-   * Get personalized relevance scores for search results
+   * Get personalized relevance scores with individual user learning
    */
   static async getPersonalizedRelevanceScores(
     orgId: string,
@@ -151,7 +176,7 @@ export class FeedbackLearningSystem {
           GROUP BY d.id, d.meta_json
         `, [orgId, result.doc_id])
 
-        // Get user-specific learning data
+        // Get user-specific learning data (enhanced)
         const userLearning = await client.query(`
           SELECT 
             COUNT(*) as user_feedback_count,
@@ -161,30 +186,42 @@ export class FeedbackLearningSystem {
               WHEN feedback_type = 'irrelevant' THEN 0.3
               WHEN feedback_type = 'bad' THEN 0.0
               ELSE 0.5
-            END) as user_avg_score
-          FROM answer_feedback
-          WHERE user_id = $1
-            AND org_id = $2
-            AND citations::jsonb @> '[{"doc_id": "' || $3 || '"}]'
-            AND created_at > NOW() - INTERVAL '90 days'
+            END) as user_avg_score,
+            -- NEW: Get individual user document interaction data
+            COALESCE(udi.relevance_score, 0.5) as personal_relevance,
+            COALESCE(udi.access_frequency, 0) as access_frequency
+          FROM answer_feedback af
+          LEFT JOIN user_document_interactions udi ON udi.document_id = $3 AND udi.user_id = $1
+          WHERE af.user_id = $1
+            AND af.org_id = $2
+            AND af.citations::jsonb @> '[{"doc_id": "' || $3 || '"}]'
+            AND af.created_at > NOW() - INTERVAL '90 days'
+          GROUP BY udi.relevance_score, udi.access_frequency
         `, [userId, orgId, result.doc_id])
 
         const docData = docLearning.rows[0]
         const userData = userLearning.rows[0]
 
-        // Calculate weighted adjustment
+        // Calculate weighted adjustment with enhanced individual learning
         let adjustmentFactor = 1.0
 
-        // Organizational learning (60% weight)
+        // Organizational learning (40% weight - reduced to give more weight to individual learning)
         if (docData.feedback_count > 0) {
           const orgAdjustment = (docData.avg_feedback_score * 0.6) + (docData.org_relevance * 0.4)
-          adjustmentFactor *= (0.4 + orgAdjustment * 0.6) // Scale to 0.4-1.0 range
+          adjustmentFactor *= (0.4 + orgAdjustment * 0.4) // Scale to 0.4-0.8 range
         }
 
-        // User-specific learning (40% weight)
+        // User-specific learning (60% weight - increased importance)
         if (userData.user_feedback_count > 0) {
           const userAdjustment = userData.user_avg_score
           adjustmentFactor *= (0.6 + userAdjustment * 0.4) // Scale to 0.6-1.0 range
+        }
+
+        // NEW: Individual document interaction history (bonus multiplier)
+        if (userData.access_frequency > 0) {
+          const frequencyBonus = Math.min(userData.access_frequency * 0.1, 0.3) // Max 30% bonus
+          const personalRelevanceBonus = (userData.personal_relevance - 0.5) * 0.2 // ±10% based on personal relevance
+          adjustmentFactor *= (1.0 + frequencyBonus + personalRelevanceBonus)
         }
 
         adjustedResults.push({
@@ -369,6 +406,89 @@ export class FeedbackLearningSystem {
             negative_feedback_count: issue.negative_feedback_count,
             current_score: issue.current_score
           }
+        })
+      }
+
+      return suggestions.sort((a, b) => b.impact_score - a.impact_score)
+    })
+  }
+
+  /**
+   * Convert feedback type to numerical rating for individual learning
+   */
+  private static feedbackTypeToRating(feedbackType: Feedback['feedback_type']): number {
+    switch (feedbackType) {
+      case 'good': return 5
+      case 'helpful': return 4
+      case 'irrelevant': return 2
+      case 'bad': return 1
+      default: return 3
+    }
+  }
+
+  /**
+   * Get individualized improvement suggestions based on user's learning profile
+   */
+  static async getIndividualizedSuggestions(
+    orgId: string,
+    userId: string
+  ): Promise<Array<{
+    type: 'learning' | 'expertise' | 'collaboration' | 'efficiency',
+    suggestion: string,
+    impact_score: number,
+    personalized_reasoning: string
+  }>> {
+    return await withOrgContext(orgId, userId, async (client) => {
+      const suggestions = []
+
+      // Get user's learning journey analysis
+      const learningAnalysis = await IndividualUserLearningSystem.analyzeLearningJourney(userId, orgId)
+      
+      // Get user's recent interaction patterns
+      const recentInteractions = await client.query(`
+        SELECT 
+          query_category,
+          AVG(user_rating) as avg_rating,
+          COUNT(*) as interaction_count,
+          AVG(follow_up_questions) as avg_follow_ups
+        FROM user_ai_interactions
+        WHERE user_id = $1 AND created_at > NOW() - INTERVAL '30 days'
+        GROUP BY query_category
+        HAVING COUNT(*) > 2
+        ORDER BY avg_rating ASC, avg_follow_ups DESC
+      `, [userId])
+
+      // Learning suggestions based on skill gaps
+      for (const gap of learningAnalysis.learningGaps.slice(0, 3)) {
+        suggestions.push({
+          type: 'learning' as const,
+          suggestion: `Develop expertise in ${gap} to match your team's level`,
+          impact_score: 0.8,
+          personalized_reasoning: `Your team shows strong expertise in ${gap}, but your individual learning profile suggests this is a growth area for you`
+        })
+      }
+
+      // Efficiency suggestions based on interaction patterns
+      const inefficientCategories = recentInteractions.rows.filter((row: any) => 
+        row.avg_rating < 3.5 || row.avg_follow_ups > 1.5
+      )
+      
+      for (const category of inefficientCategories.slice(0, 2)) {
+        suggestions.push({
+          type: 'efficiency' as const,
+          suggestion: `Improve ${category.query_category} query patterns for better results`,
+          impact_score: (5 - category.avg_rating) * 0.2,
+          personalized_reasoning: `Your ${category.query_category} questions typically require ${Math.round(category.avg_follow_ups)} follow-ups and receive ${category.avg_rating}/5 ratings`
+        })
+      }
+
+      // Collaboration suggestions based on expertise
+      for (const expertise of learningAnalysis.expertiseAreas.slice(0, 2)) {
+        suggestions.push({
+          type: 'collaboration' as const,
+          suggestion: `Share your ${expertise} knowledge through documentation or mentoring`,
+          impact_score: 0.6,
+          personalized_reasoning: `You demonstrate strong expertise in ${expertise} - sharing this knowledge could help your teammates`
         })
       }
 

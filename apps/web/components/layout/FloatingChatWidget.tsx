@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MessageCircle, X, Minimize2, Maximize2, Settings, BarChart3, GitBranch, Zap, Brain, User, LogOut, UserCog } from 'lucide-react'
+import { MessageCircle, X, Minimize2, Maximize2, Settings, BarChart3, GitBranch, Zap, Brain, User, LogOut, UserCog, TrendingUp } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { canAccessFeature } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
@@ -12,10 +12,11 @@ import SkillsMarketplace from '@/components/skills/SkillsMarketplace'
 import TeamAnalytics from '@/components/analytics/TeamAnalytics'
 import SubscriptionManager from '@/components/subscription/SubscriptionManager'
 import EnterpriseTraining from '@/components/enterprise/EnterpriseTraining'
+import IndividualLearningDashboard from '@/components/IndividualLearningDashboard'
 import type { Citation } from '@ai-companion/shared'
 
 type WidgetState = 'minimized' | 'chat' | 'expanded'
-type ActiveTab = 'chat' | 'knowledge-graph' | 'skills' | 'analytics' | 'subscription' | 'training' | 'sources' | 'automations' | 'settings'
+type ActiveTab = 'chat' | 'knowledge-graph' | 'skills' | 'analytics' | 'subscription' | 'training' | 'individual-learning' | 'sources' | 'automations' | 'settings'
 
 export default function FloatingChatWidget() {
   const { user, logout, switchUser } = useAuth()
@@ -48,6 +49,7 @@ export default function FloatingChatWidget() {
     { id: 'chat' as const, label: 'Chat', icon: MessageCircle, available: true },
     { id: 'knowledge-graph' as const, label: 'Knowledge', icon: GitBranch, available: true },
     { id: 'skills' as const, label: 'Skills', icon: Zap, available: canAccessFeature(user, 'custom-skills') },
+    { id: 'individual-learning' as const, label: 'My Learning', icon: TrendingUp, available: true },
     { id: 'analytics' as const, label: 'Analytics', icon: BarChart3, available: canAccessFeature(user, 'team-analytics') },
     { id: 'training' as const, label: 'Training', icon: Brain, available: canAccessFeature(user, 'ai-training') },
     { id: 'subscription' as const, label: 'Plan', icon: Settings, available: true },
@@ -70,6 +72,8 @@ export default function FloatingChatWidget() {
         return <KnowledgeGraphViewer orgId={orgId} />
       case 'skills':
         return <SkillsMarketplace orgId={orgId} />
+      case 'individual-learning':
+        return <IndividualLearningDashboard />
       case 'analytics':
         return <TeamAnalytics orgId={orgId} />
       case 'training':
