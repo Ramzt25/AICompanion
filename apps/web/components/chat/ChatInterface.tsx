@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import { Send, Loader2 } from 'lucide-react'
-import type { ChatResponse, Citation } from '@ai-companion/shared'
+import type { ChatResponse, Citation, ContextualSuggestion } from '@ai-companion/shared'
+import ContextualCopilot from '@/components/contextual/ContextualCopilot'
+import FeedbackPanel from '@/components/feedback/FeedbackPanel'
 
 interface ChatInterfaceProps {
   onCitationsUpdate: (citations: Citation[]) => void
@@ -21,6 +23,20 @@ export default function ChatInterface({ onCitationsUpdate }: ChatInterfaceProps)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [showFeedback, setShowFeedback] = useState<string | null>(null)
+
+  const orgId = 'demo-org-id' // In production, this comes from auth
+
+  const handleSuggestionClick = (suggestion: ContextualSuggestion) => {
+    if (suggestion.context_data?.suggested_query) {
+      setInput(suggestion.context_data.suggested_query)
+    }
+  }
+
+  const handleFeedbackSubmitted = (feedback: any) => {
+    console.log('Feedback submitted:', feedback)
+    setShowFeedback(null)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,7 +61,7 @@ export default function ChatInterface({ onCitationsUpdate }: ChatInterfaceProps)
         },
         body: JSON.stringify({
           message: input.trim(),
-          org_id: 'demo-org-id', // In production, this comes from auth
+          org_id: orgId, // In production, this comes from auth
           tools_allowed: ['google_drive', 'github']
         }),
       })
@@ -92,43 +108,84 @@ export default function ChatInterface({ onCitationsUpdate }: ChatInterfaceProps)
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Contextual Copilot */}
+        <ContextualCopilot 
+          orgId={orgId}
+          currentPage="chat"
+          onSuggestionClick={handleSuggestionClick}
+        />
+
         {messages.length === 0 && (
           <div className="text-center text-gray-500 mt-8">
             <h3 className="text-lg font-medium mb-2">Welcome to AI Knowledge Companion</h3>
             <p className="text-sm">Try asking questions like:</p>
             <ul className="mt-4 space-y-2 text-sm">
-              <li className="bg-gray-50 p-2 rounded">"What changed in the Lighting Plan REV B?"</li>
-              <li className="bg-gray-50 p-2 rounded">"Summarize the electrical specification requirements"</li>
-              <li className="bg-gray-50 p-2 rounded">"What are the key safety protocols?"</li>
+              <li className="bg-gray-50 p-2 rounded cursor-pointer hover:bg-gray-100" 
+                  onClick={() => setInput("What changed in the Lighting Plan REV B?")}
+              >
+                "What changed in the Lighting Plan REV B?"
+              </li>
+              <li className="bg-gray-50 p-2 rounded cursor-pointer hover:bg-gray-100"
+                  onClick={() => setInput("Summarize the electrical specification requirements")}
+              >
+                "Summarize the electrical specification requirements"
+              </li>
+              <li className="bg-gray-50 p-2 rounded cursor-pointer hover:bg-gray-100"
+                  onClick={() => setInput("What are the key safety protocols?")}
+              >
+                "What are the key safety protocols?"
+              </li>
             </ul>
           </div>
         )}
 
         {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
+          <div key={message.id}>
             <div
-              className={`max-w-3xl px-4 py-2 rounded-lg ${
-                message.role === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white border border-gray-200 text-gray-900'
-              }`}
+              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <div className="prose prose-sm max-w-none">
-                <p className="whitespace-pre-wrap">{message.content}</p>
-              </div>
-              
-              {message.role === 'assistant' && message.confidence && (
-                <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-                  <span>Confidence: {Math.round(message.confidence * 100)}%</span>
-                  {message.citations && (
-                    <span>{message.citations.length} citations</span>
-                  )}
+              <div
+                className={`max-w-3xl px-4 py-2 rounded-lg ${
+                  message.role === 'user'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white border border-gray-200 text-gray-900'
+                }`}
+              >
+                <div className="prose prose-sm max-w-none">
+                  <p className="whitespace-pre-wrap">{message.content}</p>
                 </div>
-              )}
+                
+                {message.role === 'assistant' && message.confidence && (
+                  <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                    <span>Confidence: {Math.round(message.confidence * 100)}%</span>
+                    <div className="flex items-center space-x-2">
+                      {message.citations && (
+                        <span>{message.citations.length} citations</span>
+                      )}
+                      <button
+                        onClick={() => setShowFeedback(showFeedback === message.id ? null : message.id)}
+                        className="text-blue-600 hover:text-blue-800 underline"
+                      >
+                        Rate answer
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
+            
+            {/* Feedback Panel */}
+            {message.role === 'assistant' && showFeedback === message.id && (
+              <div className="max-w-3xl">
+                <FeedbackPanel
+                  question={messages.find(m => m.timestamp < message.timestamp && m.role === 'user')?.content || ''}
+                  answer={message.content}
+                  citations={message.citations || []}
+                  orgId={orgId}
+                  onFeedbackSubmitted={handleFeedbackSubmitted}
+                />
+              </div>
+            )}
           </div>
         ))}
 

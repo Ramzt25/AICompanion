@@ -9,17 +9,29 @@ import {
   FileText,
   Plus,
   ChevronRight,
-  Clock
+  Clock,
+  Network,
+  Puzzle,
+  BarChart,
+  CreditCard
 } from 'lucide-react'
 
-export default function Sidebar() {
-  const [activeSection, setActiveSection] = useState('chat')
+interface SidebarProps {
+  activeSection: string
+  onSectionChange: (section: string) => void
+}
+
+export default function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
 
   const menuItems = [
     { id: 'chat', label: 'Chat', icon: MessageSquare },
     { id: 'sources', label: 'Sources', icon: Database },
     { id: 'automations', label: 'Automations', icon: Zap },
+    { id: 'knowledge-graph', label: 'Knowledge Graph', icon: Network },
+    { id: 'skills', label: 'Skills Marketplace', icon: Puzzle },
+    { id: 'analytics', label: 'Analytics', icon: BarChart },
     { id: 'memories', label: 'Memory', icon: FileText },
+    { id: 'subscription', label: 'Subscription', icon: CreditCard },
     { id: 'settings', label: 'Settings', icon: Settings },
   ]
 
@@ -45,7 +57,7 @@ export default function Sidebar() {
             return (
               <li key={item.id}>
                 <button
-                  onClick={() => setActiveSection(item.id)}
+                  onClick={() => onSectionChange(item.id)}
                   className={`w-full flex items-center space-x-3 px-3 py-2 text-sm rounded-md transition-colors ${
                     activeSection === item.id
                       ? 'bg-blue-50 text-blue-700 border border-blue-200'
