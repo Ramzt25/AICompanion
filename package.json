@@ -1,0 +1,24 @@
+{
+  "name": "ai-companion",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "db:migrate": "pnpm --filter db migrate",
+    "db:seed": "pnpm --filter db seed",
+    "db:reset": "pnpm --filter db reset",
+    "deploy": "node -e \"console.log('Use ./deploy.sh or ./deploy.ps1 for deployment')\"",
+    "start:local": "node -e \"console.log('Use ./deploy.sh start or ./deploy.ps1 start')\"",
+    "health": "node -e \"console.log('Use ./health-check.ps1 or ./health-check.sh for health checks')\""
+  },
+  "devDependencies": {
+    "turbo": "^1.10.16",
+    "@types/node": "^20.8.0",
+    "typescript": "^5.2.2"
+  },
+  "packageManager": "pnpm@8.9.0"
+}
