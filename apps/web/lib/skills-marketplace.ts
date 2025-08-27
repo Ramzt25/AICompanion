@@ -420,7 +420,7 @@ export class SkillsMarketplace {
 
     return {
       extracted_clauses: clauses,
-      clause_types_found: [...new Set(clauses.map(c => c.type))],
+      clause_types_found: Array.from(new Set(clauses.map(c => c.type))),
       total_clauses: clauses.length,
       summary: clauses.reduce((acc, clause) => {
         acc[clause.type] = (acc[clause.type] || 0) + 1
@@ -439,9 +439,14 @@ export class SkillsMarketplace {
   ): Promise<any> {
     // Analyze project timeline and identify risks
     const analysis = {
-      critical_path: [],
-      risks: [],
-      recommendations: [],
+      critical_path: [] as any[],
+      risks: [] as Array<{
+        type: string;
+        count: number;
+        severity: string;
+        description: string;
+      }>,
+      recommendations: [] as any[],
       timeline_health: 'good' as 'good' | 'warning' | 'critical'
     }
 
@@ -556,7 +561,7 @@ export class SkillsMarketplace {
         ORDER BY os.installed_at DESC
       `, [orgId])
 
-      return result.rows.map(row => ({
+      return result.rows.map((row: any) => ({
         skill: {
           id: row.id,
           name: row.name,

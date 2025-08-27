@@ -232,7 +232,7 @@ export class FeedbackLearningSystem {
         LIMIT $3
       `, [orgId, `[${questionEmbedding.join(',')}]`, limit])
 
-      return result.rows.filter(row => row.similarity > 0.7)
+      return result.rows.filter((row: any) => row.similarity > 0.7)
     })
   }
 
@@ -329,7 +329,7 @@ export class FeedbackLearningSystem {
 
       for (const gap of sourceGaps.rows) {
         suggestions.push({
-          type: 'source',
+          type: 'source' as const,
           suggestion: `Add documentation sources for: "${gap.question}"`,
           impact_score: gap.frequency * gap.bad_ratio,
           data: {
@@ -360,7 +360,7 @@ export class FeedbackLearningSystem {
 
       for (const issue of contentIssues.rows) {
         suggestions.push({
-          type: 'content',
+          type: 'content' as const,
           suggestion: `Review and update content in: "${issue.title}"`,
           impact_score: issue.negative_feedback_count * (1 - issue.current_score),
           data: {

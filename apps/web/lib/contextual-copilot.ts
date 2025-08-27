@@ -177,7 +177,7 @@ export class ContextualCopilot {
 
     const availableTypes = ['google_drive', 'github', 'slack', 'email', 'web']
     const missingTypes = availableTypes.filter(
-      type => !existingTypes.rows.some(row => row.type === type)
+      type => !existingTypes.rows.some((row: any) => row.type === type)
     )
 
     if (missingTypes.length > 0) {

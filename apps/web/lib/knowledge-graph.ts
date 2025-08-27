@@ -200,7 +200,7 @@ Text: ${text.substring(0, 2000)}
 
     return await withOrgContext(orgId, userId, async (client) => {
       let typeFilter = ''
-      let params = [orgId, `[${queryEmbedding.join(',')}]`, limit]
+      let params: any[] = [orgId, `[${queryEmbedding.join(',')}]`, limit]
 
       if (entityTypes && entityTypes.length > 0) {
         typeFilter = ` AND type = ANY($4)`
@@ -218,7 +218,7 @@ Text: ${text.substring(0, 2000)}
         LIMIT $3
       `, params)
 
-      return result.rows.filter(row => row.similarity > 0.7) // Only return relevant entities
+      return result.rows.filter((row: any) => row.similarity > 0.7) // Only return relevant entities
     })
   }
 
@@ -354,7 +354,7 @@ Text: ${text.substring(0, 2000)}
     ]
 
     for (const pattern of patterns) {
-      const matches = contextText.matchAll(new RegExp(pattern.pattern, 'gi'))
+      const matches = Array.from(contextText.matchAll(new RegExp(pattern.pattern, 'gi')))
       
       for (const match of matches) {
         const sourceText = match[1].trim().toLowerCase()

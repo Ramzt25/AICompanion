@@ -85,7 +85,7 @@ export default function SkillsMarketplace({ orgId }: SkillsMarketplaceProps) {
   }
 
   const installSkill = (skillId: string) => {
-    setInstalledSkills(prev => new Set([...prev, skillId]))
+    setInstalledSkills(prev => new Set(Array.from(prev).concat([skillId])))
   }
 
   const executeSkill = (skillId: string) => {
