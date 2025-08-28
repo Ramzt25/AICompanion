@@ -1,7 +1,6 @@
-import { GROUNDED_PROMPT_TEMPLATE } from '@ai-companion/shared'
 import { generateCompletion } from './openai'
-import { vectorSearch, rerank, buildCitations } from './retrieval'
-import type { Citation } from '@ai-companion/shared'
+import { vectorSearch, rerank, buildCitations, type ChunkResult, type Citation } from './retrieval'
+import { generateEmbedding } from '../embeddings'
 
 export interface RAGResponse {
   answer: string
@@ -9,6 +8,22 @@ export interface RAGResponse {
   retrieved_chunks: number
   confidence: number
 }
+
+// Simple prompt template since we don't have the shared package yet
+const GROUNDED_PROMPT_TEMPLATE = `You are a helpful AI assistant that answers questions based on the provided context. Always base your answers on the given information and cite your sources.
+
+Context:
+{context}
+
+Question: {query}
+
+Instructions:
+- Answer based only on the provided context
+- If the context doesn't contain enough information, say so
+- Be specific and accurate
+- Keep your response concise but complete
+
+Answer:`
 
 export async function generateGroundedAnswer(
   query: string,
@@ -22,69 +37,67 @@ export async function generateGroundedAnswer(
 ): Promise<RAGResponse> {
   const maxChunks = options?.maxChunks || 12
   
-  // Step 1: Retrieve relevant chunks
-  const retrievalFilters: any = {}
-  
-  if (options?.sourceTypes) {
-    // For now, just use the first source type
-    retrievalFilters.source_type = options.sourceTypes[0]
-  }
-  
-  if (options?.includeRecent) {
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    retrievalFilters.time_range = {
-      start: thirtyDaysAgo,
-      end: new Date()
+  try {
+    // Step 1: Generate query embedding
+    const queryEmbedding = await generateEmbedding(query)
+    
+    // Step 2: Retrieve relevant chunks from database
+    const chunks = await vectorSearch(
+      query,
+      queryEmbedding,
+      orgId,
+      maxChunks * 2, // Get more candidates for reranking
+      options
+    )
+
+    if (chunks.length === 0) {
+      return {
+        answer: "I don't have enough information in my knowledge base to answer that question. Please provide more context or check if the relevant documents have been uploaded.",
+        citations: [],
+        retrieved_chunks: 0,
+        confidence: 0
+      }
     }
-  }
 
-  const prelimResults = await vectorSearch(
-    query,
-    orgId,
-    userId,
-    50, // Get more candidates for reranking
-    retrievalFilters
-  )
-
-  if (prelimResults.length === 0) {
+    // Step 3: Rerank chunks for relevance
+    const rerankedChunks = await rerank(query, chunks, maxChunks)
+    
+    // Step 4: Build context from top chunks
+    const context = rerankedChunks
+      .map(chunk => `[${chunk.document_title || 'Document'}] ${chunk.text}`)
+      .join('\n\n')
+    
+    // Step 5: Generate answer using LLM
+    const prompt = GROUNDED_PROMPT_TEMPLATE
+      .replace('{query}', query)
+      .replace('{context}', context)
+    
+    const answer = await generateCompletion(prompt)
+    
+    // Step 6: Build citations
+    const citations = buildCitations(rerankedChunks)
+    
+    // Step 7: Calculate confidence based on chunk scores and count
+    const avgScore = rerankedChunks.reduce((sum, chunk) => sum + chunk.score, 0) / rerankedChunks.length
+    const confidence = Math.min(avgScore * 0.8 + (rerankedChunks.length / maxChunks) * 0.2, 1)
+    
     return {
-      answer: "I don't have enough information to answer your question. Please ensure relevant documents are ingested and indexed.",
+      answer,
+      citations,
+      retrieved_chunks: rerankedChunks.length,
+      confidence
+    }
+    
+  } catch (error) {
+    console.error('RAG generation error:', error)
+    return {
+      answer: "I encountered an error while processing your question. Please try again.",
       citations: [],
       retrieved_chunks: 0,
       confidence: 0
     }
   }
-
-  // Step 2: Rerank for relevance
-  const topResults = await rerank(query, prelimResults, maxChunks)
-  
-  // Step 3: Build context and citations
-  const context = topResults
-    .map((result, index) => `[${index + 1}] ${result.text}`)
-    .join('\n\n')
-  
-  const citations = buildCitations(topResults)
-  const citationsList = citations
-    .map((citation, index) => `[${index + 1}] ${citation.title} - ${citation.uri}`)
-    .join('\n')
-
-  // Step 4: Generate grounded answer
-  const prompt = GROUNDED_PROMPT_TEMPLATE
-    .replace('{context}', context)
-    .replace('{citations}', citationsList)
-    .replace('{question}', query)
-
-  const answer = await generateCompletion(prompt, 0.1)
-  
-  // Calculate confidence based on retrieval scores and result count
-  const avgScore = topResults.reduce((sum, r) => sum + r.score, 0) / topResults.length
-  const confidence = Math.min(avgScore * topResults.length * 0.1, 1.0)
-
-  return {
-    answer,
-    citations,
-    retrieved_chunks: topResults.length,
-    confidence
-  }
 }
+
+// Re-export types for convenience
+export type { ChunkResult, Citation }

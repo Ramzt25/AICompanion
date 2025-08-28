@@ -1,23 +1,108 @@
-// Simple embeddings utility for the AI Knowledge Companion
-// In production, this would connect to OpenAI API or other embedding services
+import OpenAI from 'openai'
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+})
+
+const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || 'text-embedding-3-large'
+const EMBEDDING_DIMENSIONS = 3072 // For text-embedding-3-large
 
 /**
- * Generate embeddings for text
+ * Generate embeddings for text using OpenAI API
  * @param text - Text to generate embeddings for
+ * @param model - Embedding model to use
  * @returns Promise<number[]> - Vector embedding
  */
-export async function generateEmbedding(text: string): Promise<number[]> {
-  // For demo purposes, return a mock embedding
-  // In production, this would call OpenAI's embedding API
-  const mockEmbedding = Array.from({ length: 1536 }, () => Math.random() - 0.5)
+export async function generateEmbedding(
+  text: string, 
+  model: string = EMBEDDING_MODEL
+): Promise<number[]> {
+  try {
+    if (!process.env.OPENAI_API_KEY) {
+      console.warn('OpenAI API key not found, using mock embedding')
+      return generateMockEmbedding(text)
+    }
+
+    // Clean and truncate text to fit model limits
+    const cleanText = text.replace(/\s+/g, ' ').trim()
+    const truncatedText = cleanText.substring(0, 8000) // Safe limit for most models
+
+    const response = await openai.embeddings.create({
+      model,
+      input: truncatedText,
+      encoding_format: 'float'
+    })
+
+    if (!response.data || response.data.length === 0) {
+      throw new Error('No embedding data returned from OpenAI')
+    }
+
+    return response.data[0].embedding
+  } catch (error) {
+    console.error('Error generating embedding:', error)
+    // Fallback to mock embedding if API fails
+    return generateMockEmbedding(text)
+  }
+}
+
+/**
+ * Generate batch embeddings for multiple texts
+ * @param texts - Array of texts to generate embeddings for
+ * @param model - Embedding model to use
+ * @returns Promise<number[][]> - Array of vector embeddings
+ */
+export async function generateBatchEmbeddings(
+  texts: string[],
+  model: string = EMBEDDING_MODEL
+): Promise<number[][]> {
+  try {
+    if (!process.env.OPENAI_API_KEY) {
+      console.warn('OpenAI API key not found, using mock embeddings')
+      return texts.map(generateMockEmbedding)
+    }
+
+    // Clean and truncate texts
+    const cleanTexts = texts.map(text => 
+      text.replace(/\s+/g, ' ').trim().substring(0, 8000)
+    )
+
+    const response = await openai.embeddings.create({
+      model,
+      input: cleanTexts,
+      encoding_format: 'float'
+    })
+
+    if (!response.data || response.data.length !== texts.length) {
+      throw new Error('Mismatched embedding data from OpenAI')
+    }
+
+    return response.data.map(item => item.embedding)
+  } catch (error) {
+    console.error('Error generating batch embeddings:', error)
+    // Fallback to mock embeddings if API fails
+    return texts.map(generateMockEmbedding)
+  }
+}
+
+/**
+ * Generate mock embedding for development/fallback
+ * @param text - Text to generate mock embedding for
+ * @returns number[] - Mock vector embedding
+ */
+function generateMockEmbedding(text: string): number[] {
+  // Create deterministic mock embedding based on text content
+  const embedding = Array.from({ length: EMBEDDING_DIMENSIONS }, () => Math.random() - 0.5)
   
   // Add some consistency based on text content
   const textHash = hashString(text)
-  for (let i = 0; i < 10; i++) {
-    mockEmbedding[i] = (textHash % 1000) / 1000 - 0.5
+  for (let i = 0; i < 20; i++) {
+    embedding[i] = ((textHash + i) % 1000) / 1000 - 0.5
   }
   
-  return mockEmbedding
+  // Normalize the vector
+  const norm = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0))
+  return embedding.map(val => val / norm)
 }
 
 /**

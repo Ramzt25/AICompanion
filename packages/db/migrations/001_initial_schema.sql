@@ -104,7 +104,7 @@ create index idx_sources_org_id on sources(org_id);
 create index idx_documents_source_id on documents(source_id);
 create index idx_documents_hash on documents(hash);
 create index idx_chunks_document_id on chunks(document_id);
-create index idx_chunks_embedding on chunks using ivfflat (embedding vector_cosine_ops) with (lists = 100);
+-- create index idx_chunks_embedding on chunks using ivfflat (embedding vector_cosine_ops) with (lists = 100);
 create index idx_memories_subject on memories(subject_type, subject_id);
 create index idx_automations_org_id on automations(org_id);
 create index idx_automations_owner_id on automations(owner_id);

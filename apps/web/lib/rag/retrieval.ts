@@ -1,38 +1,45 @@
 import { withOrgContext } from '../db'
-import { generateEmbedding } from './openai'
-import type { Citation } from '@ai-companion/shared'
+import { cosineSimilarity } from '../embeddings'
 
-export interface RetrievalResult {
+export interface ChunkResult {
   id: string
-  document_id: string
   text: string
   score: number
-  uri: string
-  title: string
+  document_id: string
+  document_title: string
+  document_uri: string
+  source_type: string
   meta_json: any
+}
+
+export interface Citation {
+  source: string
+  title: string
+  url?: string
+  snippet: string
 }
 
 export async function vectorSearch(
   query: string,
+  queryEmbedding: number[],
   orgId: string,
-  userId: string,
   limit: number = 50,
-  filters?: {
-    source_type?: string
-    time_range?: { start: Date; end: Date }
+  options?: {
+    includeRecent?: boolean
+    sourceTypes?: string[]
   }
-): Promise<RetrievalResult[]> {
-  const queryEmbedding = await generateEmbedding(query)
+): Promise<ChunkResult[]> {
   
-  return withOrgContext(orgId, userId, async (client) => {
+  return withOrgContext(orgId, '', async (client) => {
     let sql = `
       SELECT 
         c.id,
         c.document_id,
         c.text,
         c.meta_json,
-        d.uri,
-        d.title,
+        d.uri as document_uri,
+        d.title as document_title,
+        s.type as source_type,
         1 - (c.embedding <=> $1::vector) as score
       FROM chunks c
       JOIN documents d ON d.id = c.document_id
@@ -40,78 +47,81 @@ export async function vectorSearch(
       WHERE c.embedding IS NOT NULL
     `
     
-    const params: any[] = [JSON.stringify(queryEmbedding)]
+    const params: any[] = [`[${queryEmbedding.join(',')}]`]
     let paramIndex = 2
 
-    if (filters?.source_type) {
-      sql += ` AND s.type = $${paramIndex}`
-      params.push(filters.source_type)
+    if (options?.sourceTypes && options.sourceTypes.length > 0) {
+      sql += ` AND s.type = ANY($${paramIndex})`
+      params.push(options.sourceTypes)
       paramIndex++
     }
 
-    if (filters?.time_range) {
-      sql += ` AND d.created_at BETWEEN $${paramIndex} AND $${paramIndex + 1}`
-      params.push(filters.time_range.start, filters.time_range.end)
-      paramIndex += 2
+    if (options?.includeRecent) {
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      sql += ` AND d.created_at >= $${paramIndex}`
+      params.push(thirtyDaysAgo)
+      paramIndex++
     }
 
-    sql += ` ORDER BY c.embedding <=> $1::vector LIMIT $${paramIndex}`
+    sql += ` ORDER BY score DESC LIMIT $${paramIndex}`
     params.push(limit)
 
-    const result = await client.query(sql, params)
-    return result.rows
-  })
-}
-
-export async function rerank(
-  query: string,
-  results: RetrievalResult[],
-  topK: number = 12
-): Promise<RetrievalResult[]> {
-  // Simple re-ranking based on text similarity and metadata
-  // In production, you'd use a cross-encoder model like bge-reranker
-  
-  const queryWords = query.toLowerCase().split(/\s+/)
-  
-  const reranked = results.map(result => {
-    let score = result.score
-    
-    // Boost based on title match
-    const titleWords = result.title.toLowerCase().split(/\s+/)
-    const titleMatches = queryWords.filter(word => 
-      titleWords.some(titleWord => titleWord.includes(word) || word.includes(titleWord))
-    ).length
-    score += titleMatches * 0.1
-    
-    // Boost based on text relevance
-    const textWords = result.text.toLowerCase().split(/\s+/)
-    const textMatches = queryWords.filter(word =>
-      textWords.some(textWord => textWord.includes(word) || word.includes(textWord))
-    ).length
-    score += textMatches * 0.05
-    
-    // Boost recent documents
-    const docAge = Date.now() - new Date(result.meta_json?.last_modified || 0).getTime()
-    const daysSinceModified = docAge / (1000 * 60 * 60 * 24)
-    if (daysSinceModified < 30) {
-      score += 0.1 * (30 - daysSinceModified) / 30
+    try {
+      const result = await client.query(sql, params)
+      return result.rows.map((row: any) => ({
+        id: row.id,
+        text: row.text,
+        score: parseFloat(row.score),
+        document_id: row.document_id,
+        document_title: row.document_title,
+        document_uri: row.document_uri,
+        source_type: row.source_type,
+        meta_json: row.meta_json
+      }))
+    } catch (error) {
+      console.error('Vector search error:', error)
+      // Return empty results if search fails
+      return []
     }
-    
-    return { ...result, score }
   })
-  
-  return reranked
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topK)
 }
 
-export function buildCitations(results: RetrievalResult[]): Citation[] {
-  return results.map((result, index) => ({
-    doc_id: result.document_id,
-    chunk_id: result.id,
-    uri: result.uri,
-    title: result.title,
-    span: result.text.substring(0, 100) + '...',
-    score: result.score
-  }))
+/**
+ * Rerank search results using semantic similarity
+ */
+export async function rerank(
+  query: string, 
+  chunks: ChunkResult[], 
+  topK: number
+): Promise<ChunkResult[]> {
+  try {
+    // For now, just return the top results
+    // In production, this could use a reranking model
+    return chunks.slice(0, topK)
+  } catch (error) {
+    console.error('Reranking error:', error)
+    return chunks.slice(0, topK)
+  }
+}
+
+/**
+ * Build citations from chunks
+ */
+export function buildCitations(chunks: ChunkResult[]): Citation[] {
+  const citationMap = new Map<string, Citation>()
+  
+  chunks.forEach(chunk => {
+    const key = chunk.document_id
+    if (!citationMap.has(key)) {
+      citationMap.set(key, {
+        source: chunk.source_type,
+        title: chunk.document_title,
+        url: chunk.document_uri,
+        snippet: chunk.text.substring(0, 200) + '...'
+      })
+    }
+  })
+  
+  return Array.from(citationMap.values())
 }

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Companion Widget - Embed Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .demo-content {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .integration-code {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-content">
+        <h1 class="header">AI Companion - Embeddable Widget Demo</h1>
+        
+        <p>This page demonstrates how the AI Companion can be embedded into any website as a floating assistant.</p>
+        
+        <h2>Integration Code:</h2>
+        <div class="integration-code">
+            <code>
+&lt;script src="http://localhost:3001/widget.js" 
+        data-org-id="demo-org-id" 
+        data-user-id="demo-user"&gt;&lt;/script&gt;
+            </code>
+        </div>
+        
+        <h2>Features:</h2>
+        <ul>
+            <li>Floating chat widget that stays out of the way</li>
+            <li>Auto-minimizes after 30 seconds of inactivity</li>
+            <li>Access to knowledge base, analytics, and AI features</li>
+            <li>Contextual assistance based on current page content</li>
+            <li>No iframe - direct DOM injection for better performance</li>
+        </ul>
+        
+        <p>The AI Assistant should appear in the bottom-right corner of this page.</p>
+        
+        <h2>Sample Content</h2>
+        <p>This is sample content on a webpage. The AI Assistant can provide contextual help about this content, answer questions, and provide AI-powered insights without disrupting the user's workflow.</p>
+        
+        <p>Try clicking the AI Assistant in the bottom-right corner to see it in action!</p>
+    </div>
+
+    <!-- AI Companion Widget Integration -->
+    <script src="http://localhost:3001/widget.js" 
+            data-org-id="demo-org-id" 
+            data-user-id="demo-user"
+            data-auth-token="demo-token"></script>
+</body>
+</html>
