@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/AuthContext'
-import { IndividualUserLearningSystem } from '@/lib/individual-user-learning'
-import { FeedbackLearningSystem } from '@/lib/feedback-learning'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -44,22 +42,51 @@ export function IndividualLearningDashboard() {
     try {
       setLoading(true)
       
-      // Initialize user profile if needed
-      const profile = await IndividualUserLearningSystem.initializeUserProfile(user)
-      setUserProfile(profile)
+      // For now, use mock data until API endpoints are implemented
+      setUserProfile({
+        user_id: user.id,
+        role: user.role,
+        expertise_areas: ['Software Development', 'Project Management'],
+        learning_patterns: { preference: 'visual', pace: 'fast' },
+        query_history_analysis: { technical_queries: 65, procedural_queries: 35 }
+      })
 
-      // Get learning journey analysis
-      const insights = await IndividualUserLearningSystem.analyzeLearningJourney(
-        user.id,
-        user.organizationId || 'personal'
-      )
+      const insights = {
+        skillProgression: [
+          { skill: 'TypeScript', level: 75, velocity: 8 },
+          { skill: 'React', level: 85, velocity: 5 },
+          { skill: 'Database Design', level: 60, velocity: 12 }
+        ],
+        recommendedNextSteps: [
+          'Practice advanced TypeScript patterns',
+          'Learn GraphQL integration',
+          'Study microservices architecture'
+        ],
+        learningGaps: [
+          'DevOps practices',
+          'Testing strategies'
+        ],
+        expertiseAreas: [
+          'Frontend Development',
+          'API Design'
+        ]
+      }
       setLearningInsights(insights)
 
-      // Get personalized suggestions
-      const suggestions = await FeedbackLearningSystem.getIndividualizedSuggestions(
-        user.organizationId || 'personal',
-        user.id
-      )
+      const suggestions = [
+        {
+          type: 'learning' as const,
+          suggestion: 'Based on your recent queries, consider diving deeper into advanced React patterns',
+          impact_score: 0.85,
+          personalized_reasoning: 'You show strong React fundamentals but could benefit from hooks optimization'
+        },
+        {
+          type: 'efficiency' as const,
+          suggestion: 'Your TypeScript usage could be enhanced with utility types',
+          impact_score: 0.72,
+          personalized_reasoning: 'You frequently ask about type definitions, suggesting utility types would help'
+        }
+      ]
       setPersonalizedSuggestions(suggestions)
 
     } catch (error) {
@@ -82,15 +109,8 @@ export function IndividualLearningDashboard() {
     const query = sampleQueries[queryType as keyof typeof sampleQueries] || sampleQueries.technical
     const mockResponse = `Based on your ${user.role} role and expertise in ${userProfile?.primary_role || 'general'} areas, here's a personalized response...`
 
-    await IndividualUserLearningSystem.recordUserInteraction(
-      user.id,
-      user.organizationId || 'personal',
-      query,
-      mockResponse,
-      Math.floor(Math.random() * 2) + 4, // 4-5 rating
-      Math.floor(Math.random() * 2), // 0-1 follow-ups
-      'normal'
-    )
+    // TODO: Implement API call to record interaction
+    console.log('Recording interaction:', { query, mockResponse })
 
     // Reload data to show updates
     await loadLearningData()
